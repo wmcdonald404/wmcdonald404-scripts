@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# Lookup local VMs and pull their IPs from the arp table
+
+for vm in `virsh -q list --all | awk '{ print $2 }'`
+do
+  for mac in `virsh dumpxml $vm | grep '<mac' | awk -F "'" '{  print $2 }' | sed '/^$/d'`
+  do
+    ip=`arp -an | grep $mac | awk '{ print $2 }'`
+    echo "$vm: $ip"
+  done
+done
+
