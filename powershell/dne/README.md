@@ -36,7 +36,7 @@ As a quick workaround, DNE can be enabled and disabled from an Administrative Po
 
   ```
   PS C:\Users\Demo\Desktop> Get-NetAdapterBinding -name Ethernet
-  
+   
   Name                           DisplayName                                        ComponentID          Enabled     
   ----                           -----------                                        -----------          -------     
   Ethernet                       DNE LightWeight Filter                             dni_dne              False       
@@ -51,13 +51,13 @@ As a quick workaround, DNE can be enabled and disabled from an Administrative Po
   Ethernet                       Internet Protocol Version 6 (TCP/IPv6)             ms_tcpip6            True        
   Ethernet                       VMware Bridge Protocol                             vmware_bridge        True        
   ```
-
-Note: Again, use `Get-NetAdapterBinding -name Ethernet |  Format-List` for more information on each individual entry
+  
+  Note: Again, use `Get-NetAdapterBinding -name Ethernet |  Format-List` for more information on each individual entry
 
 3. Disable DNE on the appropriate adapter
 
   ```Set-NetAdapterBinding -name Ethernet -DisplayName "DNE LightWeight Filter" -Enabled $false```
-
+  
 4. Re-enable DNE on the adapter when done
-
+  
   ```Set-NetAdapterBinding -name Ethernet -DisplayName "DNE LightWeight Filter" -Enabled $true```
