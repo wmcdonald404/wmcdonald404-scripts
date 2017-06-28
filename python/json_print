@@ -1,0 +1,19 @@
+#!/usr/bin/python
+
+import json
+import ast
+
+with open('sample.output') as f:
+  json_data = f.read()
+f.closed
+
+print(json.dumps(ast.literal_eval(json_data), sort_keys=True, indent=4))
+
+# def pp_json(json_thing, sort=True, indents=4):
+#   if type(json_thing) is str:
+#     print(json.dumps(json.loads(json_thing), sort_keys=sort, indent=indents))
+#   else:
+#     print(json.dumps(json_thing, sort_keys=sort, indent=indents))
+#   return None
+# 
+# pp_json(json_data)
