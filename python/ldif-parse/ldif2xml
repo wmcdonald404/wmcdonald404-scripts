@@ -1,0 +1,67 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import getopt
+import ldif
+
+def usage():
+  print """
+usage: ./ldif2xml.py [-R|-U] <ldif_file>
+
+options:
+  -f <LDIF file>        LDIF file to extract users/roles from
+  -b <branch DN>  DN of the LDAP branch in LDIF to search
+  -R                    Extract role info
+  -U                    Extract user info
+"""
+
+# stores nested list of users [user cn, user UID]
+class parseusers(ldif.LDIFParser):
+  def __init__(self,input):
+    ldif.LDIFParser.__init__(self,input)
+    self.users = []
+  def handle(self,dn,entry):
+    if entry.has_key('uid'):
+      self.users.append([dn,entry['uid'][0]])
+
+# stores dictionary of full role DN entry (inc. crameruniquemembers)
+# probably just need the role cn and crameruniquemembers eventually
+# nb: sub-roles are in the format:
+# crameruniquemember: CN=CRAMER READ ACCESS - CRAMPRD,CN=ROLES,CN=CRAMERCONTEXT,DC=LDAPDOMAIN
+class parseroles(ldif.LDIFParser):
+  def __init__(self,input):
+    ldif.LDIFParser.__init__(self,input)
+    self.roles = {}
+  def handle(self,dn,entry):
+    if 'cramerRole' in entry['objectClass']:
+      self.roles[dn] = entry
+
+# build a list of users and their role memberships
+def listuserroles():
+  for uid in userlist.users:
+    print '-USERNAME: ', uid[1]
+    for role in roledict.roles.keys():
+      if roledict.roles[role].has_key('crameruniquemember'):
+        if uid[0] in roledict.roles[role]['crameruniquemember']:
+          print ' |-ROLENAME: ', roledict.roles[role]['cn'][0]
+      if roledict.roles[role].has_key('cramerUniqueMember'):
+        if uid[0] in roledict.roles[role]['cramerUniqueMember']:
+          print ' |-ROLENAME: ', roledict.roles[role]['cn'][0]
+    print
+
+# Real PROD users and roles
+# usersldif='/home/arminst/ldif2asm/users_prod.ldif'
+rolesldif='/home/arminst/ldif2asm/roles_prod.ldif'
+
+# Testing subset of PROD users and roles
+usersldif='/home/arminst/ldif2asm/users_test.ldif'
+# rolesldif='/home/arminst/ldif2asm/roles_test.ldif'
+
+userlist = parseusers(open(usersldif, 'rb'))
+userlist.parse()
+
+roledict = parseroles(open(rolesldif, 'rb'))
+roledict.parse()
+
+# listuserroles()
