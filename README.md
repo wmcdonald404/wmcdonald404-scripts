@@ -11,11 +11,19 @@ git clone git@github.com:wmcdonald404/wmcdonald404-scripts.git
 
 ```
 .
+.
 ├── bash
 │   └── virsh
 │       └── ip-lookup
-├── perl
 ├── powershell
-├── python
-└── README.md
+│   └── dne
+│       └── README.md
+└─── python
+    ├── json-parse
+    │   ├── json_print
+    │   └── sample.output
+    └── ldif-parse
+        ├── ldif2asm
+        └── ldif2xml
+
 ```
