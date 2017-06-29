@@ -1,0 +1,252 @@
+#!/usr/bin/env python
+'''
+ldif2asm -- converts user and role LDIFs into ASM formatted XML.
+ 
+ldif2asm is a small program which converts LDIFs into XML suitable for import into an ASM instance.
+'''
+ 
+import sys
+import ldif
+from optparse import OptionParser
+from cElementTree import Element, SubElement, ElementTree
+
+# Build list of list of users [user cn, user UID]
+class parseusers(ldif.LDIFParser):
+  def __init__(self,inp):
+    ldif.LDIFParser.__init__(self,inp)
+    self.users = []
+  def handle(self,dn,entry):
+    if entry.has_key('uid'):
+      self.users.append([dn,entry['uid'][0]])
+
+# Build nested dictionary of roles
+class parseroles(ldif.LDIFParser):
+  def __init__(self,inp):
+    ldif.LDIFParser.__init__(self,inp)
+    self.roles = {}
+  def handle(self,dn,entry):
+    if 'cramerRole' in entry['objectClass']:
+      self.roles[dn] = entry
+
+# build a list of users and their role memberships
+def listuserroles():
+  for uid in userlist.users:
+    print '-USERNAME: ', uid[1]
+    for role in roledict.roles.keys():
+      if roledict.roles[role].has_key('crameruniquemember'):
+        if uid[0] in roledict.roles[role]['crameruniquemember']:
+          print ' |-ROLENAME: ', roledict.roles[role]['cn'][0]
+      if roledict.roles[role].has_key('cramerUniqueMember'):
+        if uid[0] in roledict.roles[role]['cramerUniqueMember']:
+          print ' |-ROLENAME: ', roledict.roles[role]['cn'][0]
+
+def listroles():
+  for role in roledict.roles.keys():
+    print '-ROLE: ', roledict.roles[role]['cn'][0]
+
+def listparentchildroles():
+  for role in roledict.roles.keys():
+    print '-PARENT ROLE: ', roledict.roles[role]['cn'][0]
+    if roledict.roles[role].has_key('crameruniquemember'):
+      for member in roledict.roles[role]['crameruniquemember']:
+        for subrole in roledict.roles.keys():
+          if member.lower() in subrole.lower():
+            print  '  |-CHILD ROLE: ' + 'PR:OSS:' + opts.instancename + ':' + roledict.roles[subrole]['cn'][0]
+    if roledict.roles[role].has_key('cramerUniqueMember'):
+      for member in roledict.roles[role]['cramerUniqueMember']:
+        for subrole in roledict.roles.keys():
+          if member.lower() in subrole.lower():
+            print  '  |-CHILD ROLE: ' + 'PR:OSS:' + opts.instancename + ':' + roledict.roles[subrole]['cn'][0]
+ 
+def writeuserxml():
+  uamsObjects = Element('uamsObjects')
+  uamstype = SubElement(uamsObjects, 'type')
+  uamstype.attrib['name'] = 'amdocs.uams.UamsUser'
+  for uid in userlist.users:
+    rolefound = None
+    rolelist = []
+    for role in roledict.roles.keys():
+      if roledict.roles[role].has_key('crameruniquemember'):
+        if uid[0] in roledict.roles[role]['crameruniquemember']:
+          rolelist.append(roledict.roles[role]['cn'][0])
+          rolefound = True
+      if roledict.roles[role].has_key('cramerUniqueMember'):
+        if uid[0] in roledict.roles[role]['cramerUniqueMember']:
+          rolelist.append(roledict.roles[role]['cn'][0])
+          rolefound = True
+    if rolefound:
+      uamsObject = SubElement(uamstype, 'uamsObject')
+      objName = SubElement(uamsObject, 'objName')
+      objName.text = uid[1]
+      className = SubElement(uamsObject, 'className')
+      className.text = 'amdocs.uams.UamsUser'
+      attributeList = SubElement(uamsObject, 'attributeList')
+      attribute = SubElement(attributeList, 'attribute')
+      key = SubElement(attribute, 'key')
+      key.text = 'credentials'
+      datatype = SubElement(attribute, 'datatype')
+      datatype.text = 'amdocs.uams.UamsPasswordCredential'
+      value = SubElement(attribute, 'value')
+      value.text = 'Welcome1'
+      attribute = SubElement(attributeList, 'attribute')
+      key = SubElement(attribute, 'key')
+      key.text = 'roles'
+      datatype = SubElement(attribute, 'datatype')
+      datatype.text = 'String[]'
+      value = SubElement(attribute, 'value')
+      value.text = ','.join(rolelist)
+      attribute = SubElement(attributeList, 'attribute')
+      key = SubElement(attribute, 'key')
+      key.text = 'flags'
+      datatype = SubElement(attribute, 'datatype')
+      datatype.text = 'Long'
+      value = SubElement(attribute, 'value')
+      value.text = '48'
+      attribute = SubElement(attributeList, 'attribute')
+      key = SubElement(attribute, 'key')
+      key.text = 'passwordExpirationDate'
+      datatype = SubElement(attribute, 'datatype')
+      datatype.text = 'Long'
+      value = SubElement(attribute, 'value')
+      value.text = '0'
+    else:
+      print 'WARNING: User ', uid[1], ' has no associated role'
+  f = ElementTree(uamsObjects)
+  f.write(opts.usersout)
+  xmlheader = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE uamsObjects [
+<!ELEMENT uamsObjects (type)+>
+<!ELEMENT type (uamsObject)+>
+<!ELEMENT uamsObject (objName , className , attributeList? , propertyList?)>
+<!ELEMENT propertyList (property)*>
+<!ELEMENT attributeList (attribute)*>
+<!ELEMENT attribute (key , datatype , value)>
+<!ELEMENT property (key , datatype , value)>
+<!ELEMENT value (#PCDATA | array | uamsObject)*>
+<!ELEMENT key (#PCDATA)>
+<!ELEMENT className (#PCDATA)>
+<!ELEMENT objName (#PCDATA)>
+<!ELEMENT datatype (#PCDATA)>
+<!ELEMENT array (array-entry)*>
+<!ELEMENT array-entry (value)*>
+<!ATTLIST type name CDATA #REQUIRED>
+<!ATTLIST property mandatory (true | false) "true">
+<!ATTLIST attribute mandatory (true | false) "true">
+<!ATTLIST property trim (true | false) "true">
+]>"""
+  f = open(opts.usersout, 'r+')
+  old = f.read()
+  f.seek(0)
+  f.write(xmlheader + '\n' + old)
+  f.close()
+
+def writerolexml():
+  uamsObjects = Element('uamsObjects')
+  uamstype = SubElement(uamsObjects, 'type')
+  uamstype.attrib['name'] = 'amdocs.uams.UamsRole'
+  for role in roledict.roles.keys():
+    # Create a Public role 'PR:OSS:<SID>:<ROLE>'
+    uamsObject = SubElement(uamstype, 'uamsObject')
+    objName = SubElement(uamsObject, 'objName')
+    objName.text = 'PB:OSS:' + opts.instancename + ':' + roledict.roles[role]['cn'][0]
+    objclassName = SubElement(uamsObject, 'className')
+    objclassName.text = 'amdocs.uams.UamsRole'
+    attributeList = SubElement(uamsObject, 'attributeList')
+    # Include subordinate child roles
+    childroles = []
+    if roledict.roles[role].has_key('crameruniquemember'):
+      for member in roledict.roles[role]['crameruniquemember']:
+        for subrole in roledict.roles.keys():
+          if member.lower() in subrole.lower():
+            childroles.append('PR:OSS:' + opts.instancename + ':' + roledict.roles[subrole]['cn'][0])
+    if roledict.roles[role].has_key('cramerUniqueMember'):
+      for member in roledict.roles[role]['cramerUniqueMember']:
+        for subrole in roledict.roles.keys():
+          if member.lower() in subrole.lower():
+            childroles.append('PR:OSS:' + opts.instancename + ':' + roledict.roles[subrole]['cn'][0])
+    if len(childroles) > 0:
+      attribute = SubElement(attributeList, 'attribute')
+      key = SubElement(attribute, 'key')
+      key.text = 'roles'
+      datatype = SubElement(attribute, 'datatype')
+      datatype.text = 'String'
+      value = SubElement(attribute, 'value')
+      value.text = ','.join(childroles)
+    attribute = SubElement(attributeList, 'attribute')
+    key = SubElement(attribute, 'key')
+    key.text = 'type'
+    datatype = SubElement(attribute, 'datatype')
+    datatype.text = 'String'
+    value = SubElement(attribute, 'value')
+    value.text = '1'
+    # Create a Private role
+    uamsObject = SubElement(uamstype, 'uamsObject')
+    objName = SubElement(uamsObject, 'objName')
+    objName.text = 'PR:OSS:' + opts.instancename + ':' + roledict.roles[role]['cn'][0]
+    objclassName = SubElement(uamsObject, 'className')
+    objclassName.text = 'amdocs.uams.UamsRole'
+    attributeList = SubElement(uamsObject, 'attributeList')
+    attribute = SubElement(attributeList, 'attribute')
+    key = SubElement(attribute, 'key')
+    key.text = 'type'
+    datatype = SubElement(attribute, 'datatype')
+    datatype.text = 'String'
+    value = SubElement(attribute, 'value')
+    value.text = '2'
+  f = ElementTree(uamsObjects)
+  f.write(opts.rolesout)
+  xmlheader = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE uamsObjects [
+<!ELEMENT uamsObjects (type)+>
+<!ELEMENT type (uamsObject)+>
+<!ELEMENT uamsObject (objName , className , attributeList? , propertyList?)>
+<!ELEMENT propertyList (property)*>
+<!ELEMENT attributeList (attribute)*>
+<!ELEMENT attribute (key , datatype , value)>
+<!ELEMENT property (key , datatype , value)>
+<!ELEMENT value (#PCDATA | array | uamsObject)*>
+<!ELEMENT key (#PCDATA)>
+<!ELEMENT className (#PCDATA)>
+<!ELEMENT objName (#PCDATA)>
+<!ELEMENT datatype (#PCDATA)>
+<!ELEMENT array (array-entry)*>
+<!ELEMENT array-entry (value)*>
+<!ATTLIST type name CDATA #REQUIRED>
+<!ATTLIST property mandatory (true | false) "true">
+<!ATTLIST attribute mandatory (true | false) "true">
+<!ATTLIST property trim (true | false) "true">
+]>"""
+  f = open(opts.rolesout, 'r+')
+  old = f.read()
+  f.seek(0)
+  f.write(xmlheader + '\n' + old)
+  f.close()
+ 
+ 
+argv = sys.argv[1:]
+parser = OptionParser()
+parser.add_option("-u", "--user-ldif", action="store", type="string", dest="usersin", help="set user LDIF input path [default: %default]", metavar="FILE")
+parser.add_option("-U", "--user-xml", action="store", type="string", dest="usersout", help="set user XML output path [default: %default]", metavar="FILE")
+parser.add_option("-r", "--role-ldif", action="store", type="string", dest="rolesin", help="set role LDIF input path [default: %default]", metavar="FILE")
+parser.add_option("-R", "--role-xml", action="store", type="string", dest="rolesout", help="set role XML output path [default: %default]", metavar="FILE")
+parser.add_option("-b", "--role-branch", action="store", type="string", dest="rolebranch", help="set role branch DN. [default: %default]", metavar="ROLE_DN_STRING")
+parser.add_option("-i", "--instance-name", action="store", type="string", dest="instancename", help="set the actual database instance name. [default: %default]", metavar="ORACLE_SID")
+       
+# parser.set_defaults(usersin="/tmp/users.ldif", usersout="/tmp/users.xml", rolesin="/tmp/roles.ldif", rolesout="/tmp/roles.xml")
+ 
+parser.set_defaults(usersin="D:\LDIFBITS\users_prod.ldif", \
+  usersout="D:\LDIFBITS\users_prod.xml", \
+  rolesin="D:\LDIFBITS\\roles_prod.ldif", \
+  rolesout="D:\LDIFBITS\\roles_prod.xml", \
+  rolebranch="cn=Roles,cn=CramerContext,dc=LdapDomain", \
+  instancename='CTLARM01')
+ 
+# process options
+(opts, args) = parser.parse_args(argv)
+ 
+userlist = parseusers(open(opts.usersin, 'rb'))
+userlist.parse()
+roledict = parseroles(open(opts.rolesin, 'rb'))
+roledict.parse()
+writeuserxml()
+writerolexml()
