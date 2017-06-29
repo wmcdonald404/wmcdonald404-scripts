@@ -1,6 +1,6 @@
 # Toggling the DNE Lightweight Filter
 
-The DNE Lightweight Filter is required for Cisco IPSEC VPN client connectivity. However having DNE enabled on systems running VMs can prevent TCP connections from the host to brdiged interfaces on guests it's hosting. (Connections from guest to guest, or from external hosts work fine.)
+The DNE Lightweight Filter is required for Cisco IPSEC VPN client connectivity. However having DNE enabled on systems running VMs can prevent TCP connections from the host to bridged interfaces on guests it's hosting. (Connections from guest to guest, or from external hosts work fine.)
 
 As a quick workaround, DNE can be enabled and disabled from an Administrative PowerShell session:
 
