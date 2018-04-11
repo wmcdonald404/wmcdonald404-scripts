@@ -1,0 +1,4 @@
+java/jars/
+java/jars/*
+*.class
+
