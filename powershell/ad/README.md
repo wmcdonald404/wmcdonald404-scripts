@@ -6,6 +6,7 @@ Some simple steps (intended for futher automation) to set up a quick AD controll
 1. Provision a VM (steps for simulating with EC2 instances TBC).
 
 For Windows Nano: 1 x vCPU, 2GB vmem, 40GB vmdk.
+
 For the Desktop Experience: 2 vCPU & 4GB vmem, 40GB vmdk.
 
 2. Install Windows 2016 Server Core x64
