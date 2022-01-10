@@ -1,5 +1,5 @@
 # wmcdonald404-scripts
-Dumping ground for small, simple one-off scripts that may prove useful again at a later date.
+Dumping ground for small, simple one-off scripts or other bits of info that may prove useful again at a later date.
 
 # Usage
 
