@@ -13,13 +13,13 @@ For the Desktop Experience: 2 vCPU & 4GB vmem, 40GB vmdk.
 3. Set Administrator password
 
 4. Network configuration, configure:
-  IP address
-  Netmask
-  default gateway
-  servers for client resolver lookups.
-  Hostname
-  Enable Remote Desktop Access for users in the Administrators group
-  Open Windows Firewall ports for Remote Desktop Access
+  - IP address
+  - Netmask
+  - default gateway
+  - servers for client resolver lookups.
+  - Hostname
+  - Enable Remote Desktop Access for users in the Administrators group
+  - Open Windows Firewall ports for Remote Desktop Access
 
 5. Install VMware Tools (POWERSHELL TODO?)
 
@@ -47,10 +47,10 @@ w32tm /query /status
 ```
 
 8. In Server Manager, open a Powershell session to the machine destined to be the domain controller
-  Right-click 192.168.0.20
-  Windows Powershell
-  Username: Administrator
-  Password: <admin-password>
+  - Right-click 192.168.0.20
+  - Windows Powershell
+  - Username: Administrator
+  - Password: <admin-password>
 
 9. Create the Domain Controller
 
@@ -77,14 +77,14 @@ Install-ADDSForest `
 Enter the Administrator password when prompted for SafeModeAdministratorPassword:
 
 10. Refresh the host credentials in Server Manager
-  Right-click 192.168.0.20
-  Manage as
-  Username: Administrator@example004.com
-  Password: <admin-password>
-  Validate running services
+  - Right-click 192.168.0.20
+  - Manage as
+  - Username: Administrator@example004.com
+  - Password: <admin-password>
+  - Validate running services
 
 11. Validate running services
 
-PS> Get-Service adws,kdc,netlogon,dns
+```PS> Get-Service adws,kdc,netlogon,dns```
 
 
