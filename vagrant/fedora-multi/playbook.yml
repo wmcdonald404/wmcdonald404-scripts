@@ -1,0 +1,7 @@
+- name: Vagrant post-provision
+  hosts: cluster_nodes
+
+  tasks:
+    - name: Debug vars for hosts
+      debug:
+        var: ansible_play_hosts

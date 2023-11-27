@@ -1,0 +1,35 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure(2) do |config|
+  #Define the number of nodes to spin up
+  N = 3
+
+  #Iterate over nodes
+  (1..N).each do |node_id|
+    nid = (node_id - 1)
+
+    config.vm.define "node#{nid}" do |node|
+      node.vm.box = "fedora/37-cloud-base"
+      node.vm.provider "libvirt" do |vb|
+        vb.memory = "1024"
+      end
+      node.vm.hostname = "node#{nid}"
+
+      if node_id == N
+        node.vm.provision "ansible" do |ansible|
+          ansible.limit = "all"
+          ansible.groups = {
+            "cluster_nodes" => [
+              "node0",
+              "node1",
+              "node2",
+            ]
+          }
+          ansible.playbook = "playbook.yml"
+        end
+      end
+
+    end
+  end
+end
