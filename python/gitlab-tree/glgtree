@@ -1,0 +1,124 @@
+#!/usr/bin/env python
+import sys
+import getopt
+import os
+import yaml
+import json
+from gitlab import Gitlab
+from anytree.importer import JsonImporter
+from anytree import RenderTree
+
+def get_gitlab_token() -> str:
+  # Check if GITLAB_TOKEN environment variable exists
+  if 'GITLAB_TOKEN' in os.environ:
+    return os.environ['GITLAB_TOKEN']
+  
+  # Check if PAT token exists in glab configuration file
+  glab_config_path = os.path.expanduser("~/.config/glab-cli/config.yml")
+  if os.path.exists(glab_config_path):
+    with open(glab_config_path, 'r') as config_file:
+      glab_config = yaml.safe_load(config_file)
+      if 'gitlab_token' in glab_config:
+        return glab_config['gitlab_token']
+  
+  # Prompt the user to enter a PAT token
+  return input("Enter your GitLab PAT token: ")
+
+def get_gitlab_connection(gitlab_token: str):
+  gl = Gitlab(private_token=gitlab_token)
+  gl.auth()
+  return gl
+
+# Function to recursively get group structure
+def get_group_structure(gitlab_group, gitlab_connection):
+  group_data = {
+    'id': gitlab_group.id,
+    'name': gitlab_group.name,
+    'kind': 'group',
+    'children': []
+  }
+  subgroups = gitlab_group.subgroups.list()
+  for subgroup in subgroups:
+    # Use get() to fetch each subgroup individually
+    subgroup_full = gitlab_connection.groups.get(subgroup.id, gitlab_connection)
+    group_data['children'].append(get_group_structure(subgroup_full, gitlab_connection))
+  return group_data
+
+def add_project_structure(group, group_data, gitlab_connection):
+  group = gitlab_connection.groups.get(group_data['id'])
+  projects = group.projects.list()
+  for project in projects:
+    project_data = { 'id': project.id, 'name': project.name, 'kind': 'project' }
+  for data in group_data['children']:
+    add_project_structure(group_data['id'], data, gitlab_connection)
+
+def add_project_structure(group, group_data, gitlab_connection):
+  group = gitlab_connection.groups.get(group_data['id'])
+  projects = group.projects.list(get_all=True)
+  for project in projects:
+    project_data = { 'id': project.id, 'name': project.name, 'kind': 'project' }
+    group_data['children'].append(project_data)
+  for data in group_data['children']:
+    if data['kind'] == 'group':
+      add_project_structure(group.id, data, gitlab_connection)
+  return group_data
+
+def parse_command_line_options(argv):
+  # Default value
+  default_value = '86427305'
+  
+  try:
+    # Define the options and their corresponding arguments
+    opts, args = getopt.getopt(argv, "hg:", ["gvalue="])
+  except getopt.GetoptError:
+    print('Usage: example.py -g <value>')
+    sys.exit(2)
+  
+  # Parse the options and their arguments
+  for opt, arg in opts:
+    if opt == '-h':
+      print('Usage: example.py -g <value>')
+      sys.exit()
+    elif opt in ("-g", "--gvalue"):
+      default_value = arg
+  
+  # If no additional option is passed with -g, prompt the user
+  if default_value == 'default_value':
+    user_input = input(f"No additional value passed with -g. Default value is '{default_value}'. Press Enter to use default or provide a new value: ")
+    if user_input:
+      default_value = user_input
+  
+  return default_value
+
+def main(argv):
+  group_id = parse_command_line_options(argv)  
+  gitlab_token = get_gitlab_token()
+  gitlab_connection = get_gitlab_connection(gitlab_token)
+  gitlab_group = gitlab_connection.groups.get(group_id)
+  group_structure = get_group_structure(gitlab_group, gitlab_connection)
+  project_structure = add_project_structure(gitlab_group, group_structure, gitlab_connection)
+  group_structure_json = json.dumps(project_structure)
+  importer = JsonImporter()
+  root = importer.import_(group_structure_json)
+  
+  for pre, fill, node in RenderTree(root):
+    if node.kind == 'group':
+      icon = '📁'
+    else:
+      icon = '📗'
+    print("%s%s %s (%s)" % (pre, icon, node.name, node.id))
+  
+if __name__ == "__main__":
+  main(sys.argv[1:])
+
+# '🗀' (U+1F5C0)
+# '📁' (U+1F4C1)
+# '📂' (U+1F4C2)
+# '🕮' (U+1F56E)
+# '📚' (U+1F4DA)
+# '📖' (U+1F4D6)
+# '📕' (U+1F4D5)
+# '📘' (U+1F4D8)
+# '📓' (U+1F4D3)
+# '📙' (U+1F4D9)
+# '📗' (U+1F4D7)
