@@ -46,14 +46,6 @@ def get_group_structure(gitlab_group, gitlab_connection):
 
 def add_project_structure(group, group_data, gitlab_connection):
   group = gitlab_connection.groups.get(group_data['id'])
-  projects = group.projects.list()
-  for project in projects:
-    project_data = { 'id': project.id, 'name': project.name, 'kind': 'project' }
-  for data in group_data['children']:
-    add_project_structure(group_data['id'], data, gitlab_connection)
-
-def add_project_structure(group, group_data, gitlab_connection):
-  group = gitlab_connection.groups.get(group_data['id'])
   projects = group.projects.list(get_all=True)
   for project in projects:
     project_data = { 'id': project.id, 'name': project.name, 'kind': 'project' }
