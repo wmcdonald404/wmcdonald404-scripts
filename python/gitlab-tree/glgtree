@@ -8,54 +8,7 @@ from gitlab import Gitlab
 from anytree.importer import JsonImporter
 from anytree import RenderTree
 
-def get_gitlab_token() -> str:
-  # Check if GITLAB_TOKEN environment variable exists
-  if 'GITLAB_TOKEN' in os.environ:
-    return os.environ['GITLAB_TOKEN']
-  
-  # Check if PAT token exists in glab configuration file
-  glab_config_path = os.path.expanduser("~/.config/glab-cli/config.yml")
-  if os.path.exists(glab_config_path):
-    with open(glab_config_path, 'r') as config_file:
-      glab_config = yaml.safe_load(config_file)
-      if 'gitlab_token' in glab_config:
-        return glab_config['gitlab_token']
-  
-  # Prompt the user to enter a PAT token
-  return input("Enter your GitLab PAT token: ")
-
-def get_gitlab_connection(gitlab_token: str):
-  gl = Gitlab(private_token=gitlab_token)
-  gl.auth()
-  return gl
-
-# Function to recursively get group structure
-def get_group_structure(gitlab_group, gitlab_connection):
-  group_data = {
-    'id': gitlab_group.id,
-    'name': gitlab_group.name,
-    'kind': 'group',
-    'children': []
-  }
-  subgroups = gitlab_group.subgroups.list()
-  for subgroup in subgroups:
-    # Use get() to fetch each subgroup individually
-    subgroup_full = gitlab_connection.groups.get(subgroup.id, gitlab_connection)
-    group_data['children'].append(get_group_structure(subgroup_full, gitlab_connection))
-  return group_data
-
-def add_project_structure(group, group_data, gitlab_connection):
-  group = gitlab_connection.groups.get(group_data['id'])
-  projects = group.projects.list(get_all=True)
-  for project in projects:
-    project_data = { 'id': project.id, 'name': project.name, 'kind': 'project' }
-    group_data['children'].append(project_data)
-  for data in group_data['children']:
-    if data['kind'] == 'group':
-      add_project_structure(group.id, data, gitlab_connection)
-  return group_data
-
-def parse_command_line_options(argv):
+def read_command_line_options(argv):
   # Default value
   default_value = '86427305'
   
@@ -82,14 +35,65 @@ def parse_command_line_options(argv):
   
   return default_value
 
+def read_gitlab_token() -> str:
+  # Check if GITLAB_TOKEN environment variable exists
+  if 'GITLAB_TOKEN' in os.environ:
+    return os.environ['GITLAB_TOKEN']
+  
+  # Check if PAT token exists in glab configuration file
+  glab_config_path = os.path.expanduser("~/.config/glab-cli/config.yml")
+  if os.path.exists(glab_config_path):
+    with open(glab_config_path, 'r') as config_file:
+      glab_config = yaml.safe_load(config_file)
+      if 'gitlab_token' in glab_config:
+        return glab_config['gitlab_token']
+  
+  # Prompt the user to enter a PAT token
+  return input("Enter your GitLab PAT token: ")
+
+def create_gitlab_connection(gitlab_token: str):
+  gl = Gitlab(private_token=gitlab_token)
+  gl.auth()
+  return gl
+
+def read_group_list(gitlab_group_id, gitlab_connection):
+  group_list = []
+  subgroups = gitlab_connection.groups.list(get_all=True, parent=gitlab_group_id)
+  for subgroup in subgroups:
+    group_list.append({ 'parent_group_id':subgroup.parent_id, 'group_id':subgroup.id, 'group_name':subgroup.name })
+  return group_list
+
+def create_group_tree(group_list, gitlab_connection, parent_id=None):
+  tree = []
+  for group in group_list:
+    if group['parent_group_id'] == parent_id:
+      children = create_group_tree(group_list, gitlab_connection, group['group_id'])
+      if children:
+        group_dict = {'id': group['group_id'], 'name': group['group_name'], 'kind': 'group', 'children': children}
+      else:
+        group_dict = {'id': group['group_id'], 'name': group['group_name'], 'kind': 'group', 'children': []}
+      tree.append(group_dict)
+  return tree
+
+def update_project_structure(group, group_data, gitlab_connection):
+  group = gitlab_connection.groups.get(group_data['id'])
+  projects = group.projects.list(get_all=True)
+  for project in projects:
+    project_data = { 'id': project.id, 'name': project.name, 'kind': 'project' }
+    group_data['children'].append(project_data)
+  for data in group_data['children']:
+    if data['kind'] == 'group':
+      update_project_structure(group.id, data, gitlab_connection)
+  return group_data
+
 def main(argv):
-  group_id = parse_command_line_options(argv)  
-  gitlab_token = get_gitlab_token()
-  gitlab_connection = get_gitlab_connection(gitlab_token)
-  gitlab_group = gitlab_connection.groups.get(group_id)
-  group_structure = get_group_structure(gitlab_group, gitlab_connection)
-  project_structure = add_project_structure(gitlab_group, group_structure, gitlab_connection)
-  group_structure_json = json.dumps(project_structure)
+  starting_group_id = read_command_line_options(argv)  
+  gitlab_token = read_gitlab_token()
+  gitlab_connection = create_gitlab_connection(gitlab_token)
+  group_tree_list = read_group_list(starting_group_id, gitlab_connection)
+  group_tree_dict = { 'id':starting_group_id, 'name':None, 'kind':'group', 'children': create_group_tree(group_tree_list, gitlab_connection)}
+  group_tree_project_dict = update_project_structure(starting_group_id, group_tree_dict, gitlab_connection)
+  group_structure_json = json.dumps(group_tree_project_dict)
   importer = JsonImporter()
   root = importer.import_(group_structure_json)
   
