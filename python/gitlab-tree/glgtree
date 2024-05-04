@@ -56,56 +56,54 @@ def create_gitlab_connection(gitlab_token: str):
   gl.auth()
   return gl
 
-def read_group_list(gitlab_group_id, gitlab_connection):
+def read_group_list(gitlab_group_id, gitlab_connection) -> list:
   group_list = []
   subgroups = gitlab_connection.groups.list(get_all=True, parent=gitlab_group_id)
   for subgroup in subgroups:
     group_list.append({ 'parent_group_id':subgroup.parent_id, 'group_id':subgroup.id, 'group_name':subgroup.name })
   return group_list
 
-def create_group_tree(group_list, gitlab_connection, parent_id=None):
+def create_group_tree(group_list: list, gitlab_connection, parent_id=None) -> list:
   tree = []
   for group in group_list:
     if group['parent_group_id'] == parent_id:
       children = create_group_tree(group_list, gitlab_connection, group['group_id'])
       if children:
-        group_dict = {'id': group['group_id'], 'name': group['group_name'], 'kind': 'group', 'children': children}
+        group_dict = {'id': group['group_id'], 'name': group['group_name'], 'kind': 'group', 'icon':'📁', 'children': children}
+        gl_group = gitlab_connection.groups.get(group['group_id'])
+        for gl_project in gl_group.projects.list(get_all=True):
+          group_dict['children'].append({ 'id': gl_project.id, 'name':gl_project.name, 'kind':'project', 'icon':'📗'})
       else:
-        group_dict = {'id': group['group_id'], 'name': group['group_name'], 'kind': 'group', 'children': []}
+        group_dict = {'id': group['group_id'], 'name': group['group_name'], 'kind': 'group', 'icon':'📁', 'children': []}
+        gl_group = gitlab_connection.groups.get(group['group_id'])
+        for gl_project in gl_group.projects.list(get_all=True):
+          group_dict['children'].append({ 'id': gl_project.id, 'name':gl_project.name, 'kind':'project', 'icon':'📗'})
       tree.append(group_dict)
   return tree
 
-def update_project_structure(group, group_data, gitlab_connection):
-  group = gitlab_connection.groups.get(group_data['id'])
-  projects = group.projects.list(get_all=True)
-  for project in projects:
-    project_data = { 'id': project.id, 'name': project.name, 'kind': 'project' }
-    group_data['children'].append(project_data)
-  for data in group_data['children']:
-    if data['kind'] == 'group':
-      update_project_structure(group.id, data, gitlab_connection)
-  return group_data
-
 def main(argv):
-  starting_group_id = read_command_line_options(argv)  
+  start_group_id = read_command_line_options(argv)  
   gitlab_token = read_gitlab_token()
   gitlab_connection = create_gitlab_connection(gitlab_token)
-  group_tree_list = read_group_list(starting_group_id, gitlab_connection)
-  group_tree_dict = { 'id':starting_group_id, 'name':None, 'kind':'group', 'children': create_group_tree(group_tree_list, gitlab_connection)}
-  group_tree_project_dict = update_project_structure(starting_group_id, group_tree_dict, gitlab_connection)
-  group_structure_json = json.dumps(group_tree_project_dict)
+  flat_group_list = read_group_list(start_group_id, gitlab_connection)
+  tree_group_list = create_group_tree(flat_group_list, gitlab_connection)
+  tree_group_json = json.dumps(tree_group_list[0])
   importer = JsonImporter()
-  root = importer.import_(group_structure_json)
+  root = importer.import_(tree_group_json)
   
   for pre, fill, node in RenderTree(root):
-    if node.kind == 'group':
-      icon = '📁'
-    else:
-      icon = '📗'
-    print("%s%s %s (%s)" % (pre, icon, node.name, node.id))
+    print("%s%s %s (%s)" % (pre, node.icon, node.name, node.id))
   
 if __name__ == "__main__":
   main(sys.argv[1:])
+
+# TOFIX:
+# - starting tree from the main group, not the specified group (read_group_list error?)
+# - performance (investigate graphql endpoint instead of REST? (https://stackoverflow.com/a/71313528))
+
+# TODO:
+# - optionally source GITLAB_GROUP from environment
+# - CLI toggle for tree, Python dict or JSON output
 
 # '🗀' (U+1F5C0)
 # '📁' (U+1F4C1)
