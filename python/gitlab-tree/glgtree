@@ -35,7 +35,7 @@ def read_command_line_options(argv):
   
   return default_value
 
-def read_gitlab_token() -> str:
+def read_token() -> str:
   # Check if GITLAB_TOKEN environment variable exists
   if 'GITLAB_TOKEN' in os.environ:
     return os.environ['GITLAB_TOKEN']
@@ -51,48 +51,83 @@ def read_gitlab_token() -> str:
   # Prompt the user to enter a PAT token
   return input("Enter your GitLab PAT token: ")
 
-def create_gitlab_connection(gitlab_token: str):
+def create_connection(gitlab_token: str):
   gl = Gitlab(private_token=gitlab_token)
   gl.auth()
   return gl
 
-def read_group_list(gitlab_group_id, gitlab_connection) -> list:
+def read_projects(gitlab_connection) -> list:
+  project_list = []
+  for project in gitlab_connection.projects.list(get_all=True, visibility='private'):
+    project_dict = {
+      'id': project.id, 
+      'name': project.name, 
+      'parent_id': project.namespace['id'], 
+      'object_kind':'project', 
+      'object_icon':'📗'
+    }
+    project_list.append(project_dict)
+  return project_list
+
+def read_groups(gitlab_connection) -> list:
   group_list = []
-  subgroups = gitlab_connection.groups.list(get_all=True, parent=gitlab_group_id)
-  for subgroup in subgroups:
-    group_list.append({ 'parent_group_id':subgroup.parent_id, 'group_id':subgroup.id, 'group_name':subgroup.name })
+  for group in gitlab_connection.groups.list(get_all=True, visibility='private'):
+    group_dict = {
+      'id': group.id,
+      'name': group.name,
+      'parent_id': group.parent_id,
+      'object_kind':'group', 
+      'object_icon':'📁',
+      'children': []
+    }
+    group_list.append(group_dict)
   return group_list
 
-def create_group_tree(group_list: list, gitlab_connection, parent_id=None) -> list:
-  tree = []
-  for group in group_list:
-    if group['parent_group_id'] == parent_id:
-      children = create_group_tree(group_list, gitlab_connection, group['group_id'])
-      if children:
-        group_dict = {'id': group['group_id'], 'name': group['group_name'], 'kind': 'group', 'icon':'📁', 'children': children}
-        gl_group = gitlab_connection.groups.get(group['group_id'])
-        for gl_project in gl_group.projects.list(get_all=True):
-          group_dict['children'].append({ 'id': gl_project.id, 'name':gl_project.name, 'kind':'project', 'icon':'📗'})
-      else:
-        group_dict = {'id': group['group_id'], 'name': group['group_name'], 'kind': 'group', 'icon':'📁', 'children': []}
-        gl_group = gitlab_connection.groups.get(group['group_id'])
-        for gl_project in gl_group.projects.list(get_all=True):
-          group_dict['children'].append({ 'id': gl_project.id, 'name':gl_project.name, 'kind':'project', 'icon':'📗'})
-      tree.append(group_dict)
-  return tree
+# merge projects and groups
+def organise_items(projects, groups):
+  # Create a dictionary where each parent_id is a key and its value is a list of groups with that parent_id
+  parent_groups = {}
+  for group in groups:
+    parent_id = group['parent_id']
+    if parent_id is None:
+      continue
+    if parent_id not in parent_groups:
+      parent_groups[parent_id] = []
+    parent_groups[parent_id].append(group)
+  # Assign children to their respective parent groups
+  for group in groups:
+    group['children'] = parent_groups.get(group['id'], [])
+  # Move the projects to their parent groups
+  for project in projects:
+    parent_id = project['parent_id']
+    # Find the parent group
+    parent_group = next((group for group in groups if group['id'] == parent_id), None)
+    if parent_group:
+      parent_group['children'].append(project)
+  return groups
 
 def main(argv):
   start_group_id = read_command_line_options(argv)  
-  gitlab_token = read_gitlab_token()
-  gitlab_connection = create_gitlab_connection(gitlab_token)
-  flat_group_list = read_group_list(start_group_id, gitlab_connection)
-  tree_group_list = create_group_tree(flat_group_list, gitlab_connection)
-  tree_group_json = json.dumps(tree_group_list[0])
+  token = read_token()
+  connection = create_connection(token)
+  projects = read_projects(connection)
+  groups = read_groups(connection)
+  organised_items = organise_items(projects, groups)
+  for o in organised_items:
+    if o['parent_id'] == None:
+      final_dict = o
+  final_json = json.dumps(final_dict)
   importer = JsonImporter()
-  root = importer.import_(tree_group_json)
-  
+  root = importer.import_(final_json)
+
+  # print('======= projects ======= \n', projects, '\n')
+  # print('======== groups ======== \n', groups, '\n')
+  # print('==== organised list ==== \n', organised_items, '\n')
+  # print('===== final dict ======= \n', final_dict, '\n')
+  # print('===== final json ======= \n', final_json, '\n')
+
   for pre, fill, node in RenderTree(root):
-    print("%s%s %s (%s)" % (pre, node.icon, node.name, node.id))
+    print("%s%s %s (%s)" % (pre, node.object_icon, node.name, node.id))
   
 if __name__ == "__main__":
   main(sys.argv[1:])
@@ -100,10 +135,19 @@ if __name__ == "__main__":
 # TOFIX:
 # - starting tree from the main group, not the specified group (read_group_list error?)
 # - performance (investigate graphql endpoint instead of REST? (https://stackoverflow.com/a/71313528))
+#   note: gitlab_connection.projects.list(visibility='private', get_all=True)
+#     ~500 projects takes 30 secs 
+#     ~10 projects takes 1.1 secs
+#     terminal output makes little difference (few ms.)
+#   note: gitlab_connection.groups.list(get_all=True, visibility='private')
+#     ~120 groups adds 10 secs
+#     ~7 groups adds 0.4 sec
+#   comparison: the recursive glgtree version takes 2m14 for the full 648 object group/project tree
 
 # TODO:
 # - optionally source GITLAB_GROUP from environment
-# - CLI toggle for tree, Python dict or JSON output
+# - CLI toggle for anytree, JSON output or bare Python dict output
+# - decompose some of the main logic into separate functions
 
 # '🗀' (U+1F5C0)
 # '📁' (U+1F4C1)
