@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import sys
-import getopt
+import argparse
 import os
 import yaml
 import json
@@ -8,32 +8,15 @@ from gitlab import Gitlab
 from anytree.importer import JsonImporter
 from anytree import RenderTree
 
-def read_command_line_options(argv):
-  # Default value
-  default_value = '86427305'
-  
-  try:
-    # Define the options and their corresponding arguments
-    opts, args = getopt.getopt(argv, "hg:", ["gvalue="])
-  except getopt.GetoptError:
-    print('Usage: example.py -g <value>')
-    sys.exit(2)
-  
-  # Parse the options and their arguments
-  for opt, arg in opts:
-    if opt == '-h':
-      print('Usage: example.py -g <value>')
-      sys.exit()
-    elif opt in ("-g", "--gvalue"):
-      default_value = arg
-  
-  # If no additional option is passed with -g, prompt the user
-  if default_value == 'default_value':
-    user_input = input(f"No additional value passed with -g. Default value is '{default_value}'. Press Enter to use default or provide a new value: ")
-    if user_input:
-      default_value = user_input
-  
-  return default_value
+def read_cli_arguments(argv=None):
+  parser = argparse.ArgumentParser(description="Build a tree of Gitlab groups and projects")
+  group = parser.add_mutually_exclusive_group()
+  group.add_argument("-d", "--dictionary", action="store_true", help="Output as Python dictionary")
+  group.add_argument("-j", "--json", action="store_true", help="Output as JSON")
+  group.add_argument("-t", "--tree", action="store_true", help="Output as tree (default)")
+  parser.add_argument("-g", "--group", action="store_true", help="Gitlab group to base output from")
+
+  return parser.parse_args(argv)
 
 def read_token() -> str:
   # Check if GITLAB_TOKEN environment variable exists
@@ -84,7 +67,7 @@ def read_groups(gitlab_connection) -> list:
   return group_list
 
 # merge projects and groups
-def organise_items(projects, groups):
+def organise_items(projects: list, groups: list) -> dict:
   # Create a dictionary where each parent_id is a key and its value is a list of groups with that parent_id
   parent_groups = {}
   for group in groups:
@@ -104,31 +87,40 @@ def organise_items(projects, groups):
     parent_group = next((group for group in groups if group['id'] == parent_id), None)
     if parent_group:
       parent_group['children'].append(project)
-  return groups
+  for parent in groups:
+    if parent['parent_id'] == None:
+      parent_dict = parent
+  return parent_dict
 
-def main(argv):
-  start_group_id = read_command_line_options(argv)  
-  token = read_token()
-  connection = create_connection(token)
-  projects = read_projects(connection)
-  groups = read_groups(connection)
-  organised_items = organise_items(projects, groups)
-  for o in organised_items:
-    if o['parent_id'] == None:
-      final_dict = o
-  final_json = json.dumps(final_dict)
+def print_tree(tree: dict):
+  json_tree = json.dumps(tree)
   importer = JsonImporter()
-  root = importer.import_(final_json)
-
-  # print('======= projects ======= \n', projects, '\n')
-  # print('======== groups ======== \n', groups, '\n')
-  # print('==== organised list ==== \n', organised_items, '\n')
-  # print('===== final dict ======= \n', final_dict, '\n')
-  # print('===== final json ======= \n', final_json, '\n')
-
+  root = importer.import_(json_tree)
   for pre, fill, node in RenderTree(root):
     print("%s%s %s (%s)" % (pre, node.object_icon, node.name, node.id))
+
+def main(argv):
+  # Gather command line arguments
+  args = read_cli_arguments(argv)
+
+  # Read token and establish connection
+  token = read_token()
+  connection = create_connection(token)
+
+  # Gather groups, projects and establish hierarchy
+  projects = read_projects(connection)
+  groups = read_groups(connection)
+  tree = organise_items(projects, groups)
   
+  if args.dictionary:
+    print(tree)
+  elif args.json:
+    print(json.dumps(tree))
+  elif args.tree:
+    print_tree(tree)
+  else:
+    print_tree(tree)
+
 if __name__ == "__main__":
   main(sys.argv[1:])
 
@@ -146,7 +138,6 @@ if __name__ == "__main__":
 
 # TODO:
 # - optionally source GITLAB_GROUP from environment
-# - CLI toggle for anytree, JSON output or bare Python dict output
 # - decompose some of the main logic into separate functions
 
 # '🗀' (U+1F5C0)
@@ -160,3 +151,12 @@ if __name__ == "__main__":
 # '📓' (U+1F4D3)
 # '📙' (U+1F4D9)
 # '📗' (U+1F4D7)
+#
+#   # default group
+#   default_value = '86427305'  
+
+  # print('======= projects ======= \n', projects, '\n')
+  # print('======== groups ======== \n', groups, '\n')
+  # print('==== organised list ==== \n', organised_items, '\n')
+  # print('===== final dict ======= \n', final_dict, '\n')
+  # print('===== final json ======= \n', final_json, '\n')
