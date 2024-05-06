@@ -2,11 +2,13 @@
 import sys
 import argparse
 import os
-import yaml
 import json
+
+import yaml
 from gitlab import Gitlab
-from anytree.importer import JsonImporter
 from anytree import RenderTree
+from anytree.importer import JsonImporter
+
 
 def read_cli_arguments(argv=None):
   parser = argparse.ArgumentParser(description="Build a tree of Gitlab groups and projects")
@@ -153,6 +155,7 @@ if __name__ == "__main__":
 # TODO:
 # - optionally source GITLAB_GROUP from environment
 # - decompose some of the main logic into separate functions
+# - Add disk caching/refresh?
 
 # '🗀' (U+1F5C0)
 # '📁' (U+1F4C1)
