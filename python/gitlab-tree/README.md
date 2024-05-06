@@ -21,7 +21,9 @@ Exceptions *(below)* will typically be available through the OS package manager.
 `$ sudo dnf -y install python3-pyyaml python3-gitlab python3-anytree`
 
 **Ubuntu:**
-`TODO`
+`python3-yaml python3-gitlab`
+
+TODO: Find anytree packaged, or replace with a Python Standard Library.
 
 ### Installation
 
