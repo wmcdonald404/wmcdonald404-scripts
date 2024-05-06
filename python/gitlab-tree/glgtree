@@ -14,7 +14,7 @@ def read_cli_arguments(argv=None):
   group.add_argument("-d", "--dictionary", action="store_true", help="Output as Python dictionary")
   group.add_argument("-j", "--json", action="store_true", help="Output as JSON")
   group.add_argument("-t", "--tree", action="store_true", help="Output as tree (default)")
-  parser.add_argument("-g", "--group", action="store_true", help="Gitlab group to base output from")
+  parser.add_argument("-g", "--group", type=int, help="Gitlab group to base output from")
 
   return parser.parse_args(argv)
 
@@ -92,6 +92,19 @@ def organise_items(projects: list, groups: list) -> dict:
       parent_dict = parent
   return parent_dict
 
+def read_child(tree: dict, id: int) -> dict:
+  # Depth-first search
+  def dfs(node):
+    if node['id'] == id:
+      return node
+    if 'children' in node:
+      for child in node['children']:
+        result = dfs(child)
+        if result:
+          return result
+    return None  
+  return dfs(tree)
+
 def print_tree(tree: dict):
   json_tree = json.dumps(tree)
   importer = JsonImporter()
@@ -111,7 +124,9 @@ def main(argv):
   projects = read_projects(connection)
   groups = read_groups(connection)
   tree = organise_items(projects, groups)
-  
+
+  if args.group:
+    tree = read_child(tree, args.group)
   if args.dictionary:
     print(tree)
   elif args.json:
@@ -125,7 +140,6 @@ if __name__ == "__main__":
   main(sys.argv[1:])
 
 # TOFIX:
-# - starting tree from the main group, not the specified group (read_group_list error?)
 # - performance (investigate graphql endpoint instead of REST? (https://stackoverflow.com/a/71313528))
 #   note: gitlab_connection.projects.list(visibility='private', get_all=True)
 #     ~500 projects takes 30 secs 
