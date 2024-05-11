@@ -114,6 +114,26 @@ wmcdonald@fedora:~$ glgtree -g 86427321 -j | jq
 }
 ```
 
-## Contributing
+## TODO
+Areas for improvement:
+- optionally source GITLAB_GROUP from environment
+- ~~decompose some of the main logic into separate functions~~
+- ~~Add disk caching/refresh?~~
+- cache per-organisation/id?
 
+## TOFIX:
+- branch/leaf/node selection after cache addition
+- performance (investigate graphql endpoint instead of REST? (https://stackoverflow.com/a/71313528))
+    note: gitlab_connection.projects.list(visibility='private', get_all=True)
+      ~500 projects takes 30 secs 
+      ~10 projects takes 1.1 secs
+      terminal output makes little difference (few ms.)
+    note: gitlab_connection.groups.list(get_all=True, visibility='private')
+      ~120 groups adds 10 secs
+      ~7 groups adds 0.4 sec
+    comparison: the previous recursive glgtree version takes 2m14 for the full 648 object group/project tree
+
+
+
+## Contributing
 PRs welcome. IANAProgrammer so much of this is likely to be janky and inefficient.

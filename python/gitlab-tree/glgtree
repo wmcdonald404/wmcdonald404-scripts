@@ -3,12 +3,13 @@ import sys
 import argparse
 import os
 import json
-
 import yaml
-from gitlab import Gitlab
-from anytree import RenderTree
-from anytree.importer import JsonImporter
+import time
+import pathlib
 
+from gitlab import Gitlab
+from anytree import RenderTree, Node
+from anytree.importer import JsonImporter
 
 def read_cli_arguments(argv=None):
   parser = argparse.ArgumentParser(description="Build a tree of Gitlab groups and projects")
@@ -17,8 +18,37 @@ def read_cli_arguments(argv=None):
   group.add_argument("-j", "--json", action="store_true", help="Output as JSON")
   group.add_argument("-t", "--tree", action="store_true", help="Output as tree (default)")
   parser.add_argument("-g", "--group", type=int, help="Gitlab group to base output from")
-
+  
   return parser.parse_args(argv)
+
+def create_cache():
+  cache_dir = pathlib.Path.home() / '.config/glgtree/'
+  if not cache_dir.is_dir():
+    cache_dir.mkdir()
+  cache_file = pathlib.Path(cache_dir / 'cache.json')
+  cache_file.touch()
+  return cache_file
+  
+def read_cache():
+  cache_dir = pathlib.Path.home() / '.config/glgtree/'
+  cache_file = pathlib.Path(cache_dir / 'cache.json')
+  with open(cache_file) as f:
+    json_data = json.load(f)
+  return json_data
+
+def update_cache():
+  token = read_token()
+  connection = create_connection(token)
+  # Gather groups, projects and establish hierarchy
+  projects = read_projects(connection)
+  groups = read_groups(connection)
+  tree = organise_items(projects, groups)
+  json_data = json.dumps(tree)
+
+  cache_dir = pathlib.Path.home() / '.config/glgtree/'
+  cache_file = pathlib.Path(cache_dir / 'cache.json')
+  with open(cache_file, 'w') as f:
+    json.dump(json_data, f)
 
 def read_token() -> str:
   # Check if GITLAB_TOKEN environment variable exists
@@ -107,10 +137,13 @@ def read_child(tree: dict, id: int) -> dict:
     return None  
   return dfs(tree)
 
-def print_tree(tree: dict):
-  json_tree = json.dumps(tree)
+def print_tree(json_data, id: int=None):
   importer = JsonImporter()
-  root = importer.import_(json_tree)
+  root = importer.import_(json_data)
+  # if id:
+  #   node_branch = Node.get_node(root, lambda node: node.id == id)
+  # else:
+  #   node_branch = root
   for pre, fill, node in RenderTree(root):
     print("%s%s %s (%s)" % (pre, node.object_icon, node.name, node.id))
 
@@ -118,62 +151,29 @@ def main(argv):
   # Gather command line arguments
   args = read_cli_arguments(argv)
 
-  # Read token and establish connection
-  token = read_token()
-  connection = create_connection(token)
+  cache_file = pathlib.Path.home() / '.config/glgtree/cache.json'
+  cache_timeout = 24 * 3600
 
-  # Gather groups, projects and establish hierarchy
-  projects = read_projects(connection)
-  groups = read_groups(connection)
-  tree = organise_items(projects, groups)
+  if (not pathlib.Path(cache_file).exists()) or (not pathlib.Path(cache_file).is_file()):
+    create_cache()
+    update_cache()
 
-  if args.group:
-    tree = read_child(tree, args.group)
-  if args.dictionary:
-    print(tree)
-  elif args.json:
-    print(json.dumps(tree))
-  elif args.tree:
-    print_tree(tree)
-  else:
-    print_tree(tree)
+  if (time.time() - pathlib.Path(cache_file).stat().st_mtime > cache_timeout) or (pathlib.Path(cache_file).stat().st_size == 0):
+    update_cache()
+
+  json_data = read_cache()
+  print_tree(json_data, args.group)
+
+  # if args.group:
+  #   tree = read_child(tree, args.group)
+  # if args.dictionary:
+  #   print(tree)
+  # elif args.json:
+  #   print(json.dumps(tree))
+  # elif args.tree:
+  #   print_tree(tree)
+  # else:
+  #   print_tree(tree)
 
 if __name__ == "__main__":
   main(sys.argv[1:])
-
-# TOFIX:
-# - performance (investigate graphql endpoint instead of REST? (https://stackoverflow.com/a/71313528))
-#   note: gitlab_connection.projects.list(visibility='private', get_all=True)
-#     ~500 projects takes 30 secs 
-#     ~10 projects takes 1.1 secs
-#     terminal output makes little difference (few ms.)
-#   note: gitlab_connection.groups.list(get_all=True, visibility='private')
-#     ~120 groups adds 10 secs
-#     ~7 groups adds 0.4 sec
-#   comparison: the recursive glgtree version takes 2m14 for the full 648 object group/project tree
-
-# TODO:
-# - optionally source GITLAB_GROUP from environment
-# - decompose some of the main logic into separate functions
-# - Add disk caching/refresh?
-
-# '🗀' (U+1F5C0)
-# '📁' (U+1F4C1)
-# '📂' (U+1F4C2)
-# '🕮' (U+1F56E)
-# '📚' (U+1F4DA)
-# '📖' (U+1F4D6)
-# '📕' (U+1F4D5)
-# '📘' (U+1F4D8)
-# '📓' (U+1F4D3)
-# '📙' (U+1F4D9)
-# '📗' (U+1F4D7)
-#
-#   # default group
-#   default_value = '86427305'  
-
-  # print('======= projects ======= \n', projects, '\n')
-  # print('======== groups ======== \n', groups, '\n')
-  # print('==== organised list ==== \n', organised_items, '\n')
-  # print('===== final dict ======= \n', final_dict, '\n')
-  # print('===== final json ======= \n', final_json, '\n')
