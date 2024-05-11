@@ -14,9 +14,10 @@ from anytree.importer import JsonImporter
 def read_cli_arguments(argv=None):
   parser = argparse.ArgumentParser(description="Build a tree of Gitlab groups and projects")
   group = parser.add_mutually_exclusive_group()
-  group.add_argument("-d", "--dictionary", action="store_true", help="Output as Python dictionary")
+  group.add_argument("-d", "--dict", action="store_true", help="Output as Python dictionary")
   group.add_argument("-j", "--json", action="store_true", help="Output as JSON")
   group.add_argument("-t", "--tree", action="store_true", help="Output as tree (default)")
+  parser.add_argument("-f", "--force", action="store_true", help="Force cache refresh")
   parser.add_argument("-g", "--group", type=int, help="Gitlab group to base output from")
   
   return parser.parse_args(argv)
@@ -150,7 +151,11 @@ def main(argv):
   args = read_cli_arguments(argv)
 
   cache_file = pathlib.Path.home() / '.config/glgtree/cache.json'
-  cache_timeout = 24 * 3600
+  
+  if args.force:
+    cache_timeout = 0
+  else:
+    cache_timeout = 24 * 3600
 
   if (not pathlib.Path(cache_file).exists()) or (not pathlib.Path(cache_file).is_file()):
     create_cache()
@@ -161,19 +166,18 @@ def main(argv):
 
   json_string = read_cache()
   json_data = json.loads(json_string)
+  
   if args.group:
     json_data = read_json_child(json_data, args.group)
-
-  print_tree(json.dumps(json_data))
-
-  # if args.dictionary:
-  #   print(tree)
-  # elif args.json:
-  #   print(json.dumps(tree))
-  # elif args.tree:
-  #   print_tree(tree)
-  # else:
-  #   print_tree(tree)
+  
+  if args.json:
+    print(json.dumps(json_data))
+  elif args.dict:
+    print(json_data)
+  elif args.tree:
+    print_tree(json.dumps(json_data))
+  else:
+    print_tree(json.dumps(json_data))
 
 if __name__ == "__main__":
   main(sys.argv[1:])
