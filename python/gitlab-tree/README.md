@@ -6,10 +6,13 @@ A simple Python script to build a tree view of Gitlab groups and projects/reposi
 ### Prerequisites
 
 The bulk of Python modules should all be in [The Python Standard Library](https://docs.python.org/3/library/index.html).
-- `sys`
 - `argparse`
-- `os`
 - `json`
+- `os`
+- `pathlib`
+- `sys`
+- `time`
+- `yaml`
 
 Exceptions *(below)* will typically be available through the OS package manager.
 - `python3-pyyaml`
@@ -39,19 +42,27 @@ To install into a local folder on the `PATH`:
 The basic usage is:
 ```
 wmcdonald@fedora:~$ glgtree -h
-usage: glgtree [-h] [-d | -j | -t] [-g GROUP]
+usage: glgtree [-h] [-d | -j | -t] [-f] [-g GROUP]
 
 Build a tree of Gitlab groups and projects
 
 options:
   -h, --help            show this help message and exit
-  -d, --dictionary      Output as Python dictionary
+  -d, --dict            Output as Python dictionary
   -j, --json            Output as JSON
   -t, --tree            Output as tree (default)
+  -f, --force           Force cache refresh
   -g GROUP, --group GROUP
                         Gitlab group to base output from
 ```
 
+## Caching
+By default the script will check for, and use a cached copy of the JSON data retrived from the Gitlab API under `~/.config/glgtree/cache.json`. If there's no cached data, fresh data will be retrived from the API.
+
+This data will be refreshed after 24 hours, a refresh can be forced with `-f` or `--force` arguments.
+
+
+## Output
 Default rendering:
 ```
 wmcdonald@fedora:~$ glgtree 
