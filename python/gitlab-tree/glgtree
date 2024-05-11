@@ -157,10 +157,12 @@ def main(argv):
   else:
     cache_timeout = 24 * 3600
 
+  # check for cache file existance, create if missing
   if (not pathlib.Path(cache_file).exists()) or (not pathlib.Path(cache_file).is_file()):
     create_cache()
     update_cache()
 
+  # check for cached JSON file expiry
   if (time.time() - pathlib.Path(cache_file).stat().st_mtime > cache_timeout) or (pathlib.Path(cache_file).stat().st_size == 0):
     update_cache()
 
