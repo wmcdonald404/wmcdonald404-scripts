@@ -122,7 +122,7 @@ Areas for improvement:
 - cache per-organisation/id?
 
 ## TOFIX:
-- branch/leaf/node selection after cache addition
+- ~~branch/leaf/node selection after cache addition~~
 - performance (investigate graphql endpoint instead of REST? (https://stackoverflow.com/a/71313528))
     note: gitlab_connection.projects.list(visibility='private', get_all=True)
       ~500 projects takes 30 secs 
@@ -132,8 +132,6 @@ Areas for improvement:
       ~120 groups adds 10 secs
       ~7 groups adds 0.4 sec
     comparison: the previous recursive glgtree version takes 2m14 for the full 648 object group/project tree
-
-
 
 ## Contributing
 PRs welcome. IANAProgrammer so much of this is likely to be janky and inefficient.

@@ -8,7 +8,7 @@ import time
 import pathlib
 
 from gitlab import Gitlab
-from anytree import RenderTree, Node
+from anytree import RenderTree, Node, AnyNode
 from anytree.importer import JsonImporter
 
 def read_cli_arguments(argv=None):
@@ -98,8 +98,8 @@ def read_groups(gitlab_connection) -> list:
     group_list.append(group_dict)
   return group_list
 
-# merge projects and groups
 def organise_items(projects: list, groups: list) -> dict:
+  # merge projects and groups
   # Create a dictionary where each parent_id is a key and its value is a list of groups with that parent_id
   parent_groups = {}
   for group in groups:
@@ -124,26 +124,24 @@ def organise_items(projects: list, groups: list) -> dict:
       parent_dict = parent
   return parent_dict
 
-def read_child(tree: dict, id: int) -> dict:
-  # Depth-first search
-  def dfs(node):
-    if node['id'] == id:
-      return node
-    if 'children' in node:
-      for child in node['children']:
-        result = dfs(child)
-        if result:
-          return result
-    return None  
-  return dfs(tree)
+def read_json_child(json_data, id: int):
+  if json_data.get("id") == id:
+    return json_data
+  
+  # Check if the current object has children
+  if "children" in json_data:
+    # Iterate through children recursively
+    for child in json_data["children"]:
+      result = read_json_child(child, id)
+      if result:
+        return result
+  
+  # If the id is not found in the current object or its children
+  return None
 
-def print_tree(json_data, id: int=None):
+def print_tree(json_data: str):
   importer = JsonImporter()
-  root = importer.import_(json_data)
-  # if id:
-  #   node_branch = Node.get_node(root, lambda node: node.id == id)
-  # else:
-  #   node_branch = root
+  root = importer.import_(json_data)  
   for pre, fill, node in RenderTree(root):
     print("%s%s %s (%s)" % (pre, node.object_icon, node.name, node.id))
 
@@ -161,11 +159,13 @@ def main(argv):
   if (time.time() - pathlib.Path(cache_file).stat().st_mtime > cache_timeout) or (pathlib.Path(cache_file).stat().st_size == 0):
     update_cache()
 
-  json_data = read_cache()
-  print_tree(json_data, args.group)
+  json_string = read_cache()
+  json_data = json.loads(json_string)
+  if args.group:
+    json_data = read_json_child(json_data, args.group)
 
-  # if args.group:
-  #   tree = read_child(tree, args.group)
+  print_tree(json.dumps(json_data))
+
   # if args.dictionary:
   #   print(tree)
   # elif args.json:
