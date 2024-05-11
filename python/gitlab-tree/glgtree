@@ -1,15 +1,15 @@
 #!/usr/bin/env python
-import sys
 import argparse
-import os
 import json
-import yaml
-import time
+import os
 import pathlib
+import sys
+import time
+import yaml
 
-from gitlab import Gitlab
 from anytree import RenderTree, Node, AnyNode
 from anytree.importer import JsonImporter
+from gitlab import Gitlab
 
 def read_cli_arguments(argv=None):
   parser = argparse.ArgumentParser(description="Build a tree of Gitlab groups and projects")
@@ -17,7 +17,7 @@ def read_cli_arguments(argv=None):
   group.add_argument("-d", "--dict", action="store_true", help="Output as Python dictionary")
   group.add_argument("-j", "--json", action="store_true", help="Output as JSON")
   group.add_argument("-t", "--tree", action="store_true", help="Output as tree (default)")
-  parser.add_argument("-f", "--force", action="store_true", help="Force cache refresh")
+  parser.add_argument("-f", "--force", action="store_true", help="Force cache refresh (~/.config/glgtree/cache.json)")
   parser.add_argument("-g", "--group", type=int, help="Gitlab group to base output from")
   
   return parser.parse_args(argv)
