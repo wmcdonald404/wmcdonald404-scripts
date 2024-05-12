@@ -124,7 +124,7 @@ def organise_items(projects: list, groups: list) -> dict:
       parent_dict = parent
   return parent_dict
 
-def read_json_child(json_data: dict, id: int):
+def read_json_child(json_data: dict, id: int) -> dict:
   if json_data.get("id") == id:
     return json_data
   
