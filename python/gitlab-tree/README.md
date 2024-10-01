@@ -130,6 +130,9 @@ Areas for improvement:
 - optionally source GITLAB_GROUP from environment
 - ~~decompose some of the main logic into separate functions~~
 - ~~Add disk caching/refresh?~~
+- separate out CLI from "API"
+- Modularise
+- Write pytest tests
 - cache per-organisation/id?
 
 ## TOFIX:
