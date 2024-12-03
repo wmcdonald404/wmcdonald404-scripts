@@ -1,5 +1,5 @@
 ## About
-A simple Python script to build a tree view of Gitlab groups and projects/repositories. See [Gitlab Group and Project Tree Walk](https://wmcdonald404.github.io/github-pages/2024/04/28/16-34-48-gitlab-group-and-project-tree-walk.html) for more.
+A simple Python script to build a tree view of Gitlab groups and projects/repositories. See [Gitlab Group and Project Tree Walk](https://wmcdonald404.co.uk/2024/04/28/gitlab-group-and-project-tree-walk.html) for more.
 
 ## Get Started
 
